@@ -30,14 +30,16 @@ CONVERGENCE_LIMIT_S = 15 * 60
 START_LEAD_S = 3.0          # t0 = instante do comando + 3 s (D-008)
 POLL_S = 1.0
 CLIENT_ID = "client-1"
+CODE_PATHS = ["client", "server", "experiments", "docker", "analysis"]
 
 
 def log(msg):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
-def derive_seed(master, scenario, rep, role):
-    raw = f"{master}|{scenario}|{rep}|{role}".encode()
+def derive_seed(master, scenario, rep, role, tag=""):
+    # tag vazio = derivação original; tag não vazio = novas sementes para retomar execuções.
+    raw = (f"{master}|{scenario}|{rep}|{role}" + (f"|{tag}" if tag else "")).encode()
     return int(hashlib.sha256(raw).hexdigest()[:8], 16)
 
 
@@ -81,7 +83,8 @@ def static_info():
     root = str(dc.ROOT)
     return {
         "git_commit": cmd_out(["git", "-C", root, "rev-parse", "HEAD"]),
-        "git_dirty": bool(cmd_out(["git", "-C", root, "status", "--porcelain"])),
+        # Só o código conta: documentação (EXECUTION_LOG.md etc.) pode mudar durante a rodada.
+        "git_dirty": bool(cmd_out(["git", "-C", root, "status", "--porcelain", "--", *CODE_PATHS])),
         "docker_version": cmd_out(["docker", "version", "--format",
                                    "client {{.Client.Version}} / server {{.Server.Version}}"]),
         "host": host_info(),
@@ -163,9 +166,9 @@ def initial_spec(scenario, offline_spec):
 
 
 def run_once(scenario_id, scenario, offline_spec, rep, is_warmup, master_seed, run_dir,
-             static, n_events, allow_clock_mismatch):
+             static, n_events, allow_clock_mismatch, seed_tag="", is_pilot=False):
     run_dir.mkdir(parents=True, exist_ok=False)
-    seeds = {role: derive_seed(master_seed, scenario_id, "warmup" if is_warmup else rep, role)
+    seeds = {role: derive_seed(master_seed, scenario_id, "warmup" if is_warmup else rep, role, seed_tag)
              for role in ("client", "jitter", "server")}
     drop_rate = scenario.get("drop_response_rate", 0.0)
     timings = {"run_started_ns": time.time_ns()}
@@ -181,7 +184,8 @@ def run_once(scenario_id, scenario, offline_spec, rep, is_warmup, master_seed, r
     manifest = {
         "run_id": run_dir.name, "scenario": scenario_id, "scenario_definition": scenario,
         "offline_spec": offline_spec, "repetition": None if is_warmup else rep,
-        "is_warmup": is_warmup, "master_seed": master_seed, "seeds": seeds,
+        "is_warmup": is_warmup, "is_pilot": is_pilot, "master_seed": master_seed,
+        "seed_tag": seed_tag, "seeds": seeds,
         "parameters": {
             "clients": 1, "concurrent_requests": 1, "n_events": n_events, "rate_per_s": RATE_PER_S,
             "convergence_limit_s": CONVERGENCE_LIMIT_S, "drop_response_rate": drop_rate,
@@ -205,6 +209,7 @@ def run_once(scenario_id, scenario, offline_spec, rep, is_warmup, master_seed, r
             net.set(spec0, "initial")
         t0_ns = time.time_ns() + int(START_LEAD_S * 1e9)
         timings["t0_ns"] = t0_ns
+        net.mark("t0", t0_ns, spec0)
 
         # 5. cliente
         client_cmd = ["docker", "exec", dc.CLIENT, "python", "-m", "sync_client.main",
@@ -295,8 +300,16 @@ def main():
                     help="só para testes do protótipo; a metodologia fixa N = 1000")
     ap.add_argument("--allow-clock-mismatch", action="store_true", help="só para depuração (D-013)")
     ap.add_argument("--no-build", action="store_true")
+    ap.add_argument("--pilot", action="store_true",
+                    help="execução piloto: sem aquecimento, gravada em <out>/_pilot/ (fora da análise)")
+    ap.add_argument("--reps-list", default="",
+                    help="retomada: só estas repetições (ex.: 2,3), em vez de 1..reps")
+    ap.add_argument("--seed-tag", default="",
+                    help="retomada: rótulo misturado à derivação das sementes (novas sementes)")
     args = ap.parse_args()
 
+    if args.pilot and not args.seed_tag:
+        args.seed_tag = "pilot"  # sementes do piloto distintas das da rodada
     offline_spec, scenarios = load_scenarios()
     ids = [s.strip() for s in args.scenarios.split(",") if s.strip()]
     unknown = [s for s in ids if s not in scenarios]
@@ -321,16 +334,22 @@ def main():
     battery_file = out / f"battery_{stamp}.json"
     t_start = time.monotonic()
     for sid in ids:
-        plan = ([] if args.no_warmup else [(0, True)]) + [(r, False) for r in range(1, args.reps + 1)]
+        reps = ([int(r) for r in args.reps_list.split(",") if r.strip()] if args.reps_list
+                else list(range(1, args.reps + 1)))
+        warmup = not (args.no_warmup or args.pilot)
+        plan = ([(0, True)] if warmup else []) + [(r, False) for r in reps]
         for rep, is_warmup in plan:
-            run_id = f"{sid}_{'warmup' if is_warmup else f'r{rep:02d}'}_{stamp}"
-            run_dir = (out / "_warmup" if is_warmup else out) / run_id
+            kind = "warmup" if is_warmup else ("pilot" if args.pilot else f"r{rep:02d}")
+            run_id = f"{sid}_{kind}_{stamp}" + (f"_{args.seed_tag}" if args.seed_tag else "")
+            parent = out / "_warmup" if is_warmup else (out / "_pilot" if args.pilot else out)
+            run_dir = parent / run_id
             log(f"{run_id}: iniciando")
             t = time.monotonic()
             entry = {"run_id": run_id, "scenario": sid, "is_warmup": is_warmup, "dir": str(run_dir)}
             try:
                 m = run_once(sid, scenarios[sid], offline_spec, rep, is_warmup, args.master_seed,
-                             run_dir, static, args.n_events, args.allow_clock_mismatch)
+                             run_dir, static, args.n_events, args.allow_clock_mismatch,
+                             seed_tag=args.seed_tag, is_pilot=args.pilot)
                 entry.update(converged=m["converged"], wall_time_s=m["wall_time_s"])
                 log(f"{run_id}: converged={m['converged']} em {time.monotonic() - t:.0f} s")
             except Exception as exc:

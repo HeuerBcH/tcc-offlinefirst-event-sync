@@ -10,7 +10,7 @@ Itens marcados **[CONFIRMAR]** precisam do aval do autor antes dos experimentos 
 - **Decisão:** `client/`, `server/` e `experiments/` usam só a biblioteca padrão. `analysis/` usa `numpy`, `scipy` e `matplotlib`, declarados em `analysis/requirements.txt`.
 - **Motivo:** exceção prevista no plano (seção 0, item 5). Teste de Mann–Whitney, percentis e gráficos não justificam reimplementação.
 
-## D-002 — Parâmetros de projeto abertos (valores padrão) [CONFIRMAR]
+## D-002 — Parâmetros de projeto abertos (valores padrão) [CONFIRMADO em D-019]
 - **Data:** 2026-10-31
 - **Decisão:** valores padrão sugeridos pelo plano, todos configuráveis por argumento ou variável de ambiente do cliente/servidor:
   - mistura de operações: CREATE 30%, UPDATE 60%, DELETE 10%;
@@ -46,7 +46,7 @@ Itens marcados **[CONFIRMAR]** precisam do aval do autor antes dos experimentos 
 - **Decisão:** a k-ésima falha consecutiva (k ≥ 1) espera `uniform(0, min(T_max, T_base × 2^(k−1)))` (full jitter). A primeira espera tem teto 0,5 s; o teto chega a 30 s em k = 7 (0,5 × 64 = 32 → 30). O RNG do jitter é `random.Random(jitter_seed)`, com `jitter_seed` derivado da semente da execução pelo orquestrador.
 - **Motivo:** plano, seção 4.6 (torna explícito o `n` da fórmula da especificação).
 
-## D-007 — Gerador: identificadores, campos e tamanho do payload [CONFIRMAR]
+## D-007 — Gerador: identificadores, campos e tamanho do payload [CONFIRMADO em D-019]
 - **Data:** 2026-10-31
 - **Decisão:**
   1. `event_id` e `entity_id` são UUID versão 4 gerados a partir do RNG da semente (`uuid.UUID(int=rng.getrandbits(128), version=4)`), e não de `os.urandom`. Assim a sequência inteira, inclusive os identificadores, é reprodutível.
@@ -99,7 +99,7 @@ Itens marcados **[CONFIRMAR]** precisam do aval do autor antes dos experimentos 
 ## D-015 — Orquestrador: detalhes de execução
 - **Data:** 2026-10-31
 - **Decisão:**
-  1. **Sementes:** `int(sha256(f"{master}|{cenário}|{repetição}|{papel}")[:8], 16)`, com papel ∈ {client, jitter, server} e repetição = `warmup` no aquecimento. Semente-mestre padrão 20261031, registrada no manifesto. Cada cenário e repetição tem carga própria (amostras independentes). **[CONFIRMAR]** A alternativa seria a mesma carga para a repetição i de todos os cenários (desenho pareado).
+  1. **Sementes:** `int(sha256(f"{master}|{cenário}|{repetição}|{papel}")[:8], 16)`, com papel ∈ {client, jitter, server} e repetição = `warmup` no aquecimento. Semente-mestre padrão 20261031, registrada no manifesto. Cada cenário e repetição tem carga própria (amostras independentes).  A alternativa seria a mesma carga para a repetição i de todos os cenários (desenho pareado). **Confirmado em D-019: independentes.**
   2. **t0** = instante do comando + 3 s (D-008). A condição de rede inicial é aplicada antes de t0.
   3. **Mudança de rede:** o comando é executado nos dois containers em paralelo. O instante da mudança é `t_applied_ns` = o mais tardio dos instantes "depois" (a condição vale com certeza nos dois sentidos). `t_first_before_ns` e os instantes por container também ficam em `network_events.jsonl`. Nos ciclos (S7, S8, S10) os instantes-alvo são t0 + k × meio-período, sem acumular a latência do exec.
   4. **Limite de convergência:** t_ref = último `created_at_ns` (lido de `generation_done.json`) ou, em S5/S6, o mais tardio entre ele e `restore_ns`. Passados 15 min de t_ref, o orquestrador envia SIGTERM ao cliente (PID em `/data/client.pid`) e marca `converged=false`. Há também um teto de segurança: t0 + N/taxa + interrupção + 15 min + 2 min.
@@ -135,3 +135,24 @@ Itens marcados **[CONFIRMAR]** precisam do aval do autor antes dos experimentos 
 - **Data:** 2026-10-31
 - **S0, N = 1000** (Docker no WSL2): convergiu em 110 s de tempo real; R1 = 100%, R2 = 0, R4 = 1,0, R5 = 0%, C1 = C3 = C4 = 0, D1 mediana 18,5 ms, p95 27,0 ms, máx. 40,7 ms, D5 = 7,77, D6 = 1. Sem netem, D1 ≈ 18 ms vem principalmente das gravações duráveis do SQLite (vários commits com fsync por evento, no cliente e no servidor), e não da rede (RTT ≈ 0,1 ms). Vale descrever isso no texto ao interpretar D1.
 - **S9, N = 1000** (fase 6, descarte de resposta em Docker): o servidor descartou 68 de 901 respostas (7,5% realizados, com taxa configurada de 10%; sorteio com semente). O cliente registrou exatamente 68 `remote_disconnected`, reenviou, recebeu 83 `DUPLICATE` (C2) e terminou com C1 = 0, C3 = 0, C4 = 0, R1 = 100%.
+
+## D-019 — Confirmações do autor (antes da rodada preliminar)
+- **Data:** 2026-10-31
+- **Decisão (confirmada pelo autor):**
+  1. **D-002:** padrões de projeto mantidos: mistura CREATE 30% / UPDATE 60% / DELETE 10%, campos de texto com 64 caracteres, limite da fila de 10000 eventos, intervalo de verificação de 1 s.
+  2. **D-007:** gerador mantido (UPDATE altera um campo sorteado; payload de 16, 76 ou 82 bytes). O **texto do TCC** será ajustado para dizer que o tamanho é fixo por campo, e não por tipo de operação.
+  3. **D-015:** sementes independentes por cenário e repetição (amostras independentes).
+- **Pendente:** D-017 (métricas testadas) só é necessário na bateria completa, porque a rodada preliminar é apenas descritiva. Ver `PENDENCIAS.md`.
+
+## D-020 — Ferramentas da rodada preliminar (Plano do Passo 6)
+- **Data:** 2026-10-31
+- **Decisão:**
+  1. **Marcador t0:** `network_events.jsonl` ganha um registro `t0` (`marker: true`, sem comando tc) com a condição de rede vigente. Em S0 o arquivo traz `reset` (remoção preventiva do netem), `t0` e `final` (remoção no fim); `reset` e `final` são comandos `tc qdisc del` reais e ficam registrados porque o plano pede o instante de todo comando.
+  2. **Piloto:** `run_experiment.py --pilot` roda sem aquecimento e grava em `data/raw/_pilot/`, com sementes próprias (`seed_tag = "pilot"`). `is_pilot` fica no manifesto.
+  3. **Retomada após interrupção:** `--reps-list 2,3 --seed-tag <rótulo>` roda só as repetições que faltam, com sementes novas (o rótulo entra na derivação, D-015, e no `run_id`).
+  4. **`git_dirty`** considera só as pastas de código (`client`, `server`, `experiments`, `docker`, `analysis`). Documentação como `EXECUTION_LOG.md` pode ser editada durante a rodada sem invalidar o manifesto.
+  5. **`metrics.py --in data/raw --out data/processed`** grava `metrics_per_run.csv` e `summary_preliminary.csv`. Este tem uma linha por cenário e métrica, com os valores individuais (`value_1..value_n`, na ordem das repetições, e `run_ids`), média, mínimo e máximo. R3 aparece como linha própria. O desvio padrão fica de fora (n = 3).
+  6. **`plots.py --in data/processed`:** D1 (mediana por execução), D2 e D3 como pontos individuais + traço da média. O boxplot de D1 só é gerado com n ≥ 5 (bateria completa). Série da fila em S6 (e S8, se houver).
+  7. **`checks.py`** (seção 4 do plano). Critérios operacionais que o plano não fixa: "S2 maior que S0" e "S4 maior que S0" = o menor valor do cenário é maior que o maior valor de S0 (comparação descritiva, sem teste). "D6 muito menor que 1000" em S2 = D6 ≤ 100 (10% de N) em todas as execuções. Em S6, o limite de D3 usa a latência medida da mudança `restore` daquela execução. Os critérios são escolhas do agente, estão escritos no relatório e podem ser trocados pelo autor (ver `PENDENCIAS.md`).
+  8. `stats.py` não é executado na rodada preliminar (n = 3: o menor p exato bilateral do Mann–Whitney é 0,10).
+- **Motivo:** Plano do Passo 6, seções 3, 4 e 7.

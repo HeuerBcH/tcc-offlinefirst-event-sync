@@ -1,10 +1,9 @@
 """Gráficos para o texto do TCC (plano, seção 7.4), em PDF e PNG.
 
-    python analysis/plots.py [--raw data/raw] [--metrics data/processed/metrics_per_run.csv]
-                             [--out data/figures]
+    python analysis/plots.py [--in data/processed] [--raw data/raw] [--out data/figures]
 
-- d1_median_boxplot: mediana de D1 por execução, por cenário;
-- d2_bars, d3_bars: média ± desvio padrão por cenário;
+- d1_median_points: mediana de D1 de cada execução, por cenário (boxplot só com n >= 5);
+- d2_points, d3_points: valor de cada execução e média, por cenário;
 - queue_<S6|S8>: tamanho da fila (criados − ACKED) ao longo do tempo, uma linha por execução.
 """
 import argparse
@@ -69,18 +68,29 @@ def boxplot(rows, out):
     save(fig, out, "d1_median_boxplot")
 
 
-def bars(rows, metric, ylabel, out, name):
+def dots(rows, metric, ylabel, out, name, log=False):
+    """Valores individuais por cenário (um ponto por execução) e a média como traço.
+
+    Usado na rodada preliminar (n = 3), em que boxplot e desvio padrão pouco informam.
+    """
     data = per_scenario(rows, metric)
     if not data:
         return
-    labels = list(data)
-    means = [np.mean(v) for v in data.values()]
-    sds = [np.std(v, ddof=1) if len(v) > 1 else 0 for v in data.values()]
     fig, ax = plt.subplots(figsize=(6, 3))
-    ax.bar(labels, means, width=0.6, color=SERIES, yerr=sds, capsize=3,
-           error_kw={"ecolor": INK_2, "elinewidth": 1})
+    for x, (sc, v) in enumerate(data.items()):
+        offsets = np.linspace(-0.12, 0.12, len(v)) if len(v) > 1 else [0.0]
+        ax.scatter([x + o for o in offsets], v, s=28, color=SERIES, edgecolors="white",
+                   linewidths=0.8, zorder=3, label="execução" if x == 0 else None)
+        ax.hlines(np.mean(v), x - 0.25, x + 0.25, color=INK, linewidth=1.5, zorder=2,
+                  label="média" if x == 0 else None)
+    ax.set_xticks(range(len(data)), list(data))
+    ax.set_xlim(-0.6, len(data) - 0.4)
+    if log:
+        ax.set_yscale("log")
+        ax.set_title("Escala logarítmica", loc="left", color=INK_2, fontsize=8)
     ax.set_xlabel("Cenário")
     ax.set_ylabel(ylabel)
+    ax.legend(frameon=False, fontsize=8, loc="best")
     save(fig, out, name)
 
 
@@ -104,16 +114,21 @@ def queue_plot(raw, scenario, out):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--raw", default="data/raw")
-    ap.add_argument("--metrics", default="data/processed/metrics_per_run.csv")
+    ap.add_argument("--in", dest="processed", default="data/processed",
+                    help="diretório com metrics_per_run.csv")
+    ap.add_argument("--raw", default="data/raw", help="execuções brutas (para a série da fila)")
+    ap.add_argument("--metrics", default=None, help="caminho alternativo de metrics_per_run.csv")
     ap.add_argument("--out", default="data/figures")
     args = ap.parse_args(argv)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    rows = load_rows(args.metrics)
-    boxplot(rows, out)
-    bars(rows, "D2_s", "D2: tempo até esvaziar a fila (s)", out, "d2_bars")
-    bars(rows, "D3_s", "D3: tempo de retomada (s)", out, "d3_bars")
+    rows = load_rows(args.metrics or Path(args.processed) / "metrics_per_run.csv")
+    max_n = max(len(v) for v in per_scenario(rows, "D1_median_ms").values()) if rows else 0
+    dots(rows, "D1_median_ms", "D1, mediana por execução (ms)", out, "d1_median_points", log=True)
+    if max_n >= 5:
+        boxplot(rows, out)  # bateria completa (n = 10)
+    dots(rows, "D2_s", "D2: tempo até esvaziar a fila (s)", out, "d2_points")
+    dots(rows, "D3_s", "D3: tempo de retomada (s)", out, "d3_points")
     for sc in ("S6", "S8"):
         queue_plot(args.raw, sc, out)
     print(f"figuras em {out}")

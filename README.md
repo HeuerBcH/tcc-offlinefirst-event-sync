@@ -75,6 +75,8 @@ protótipo.
 data/raw/
   battery_<timestamp>.json          # execuções da bateria, erros e tempo real decorrido
   _warmup/<run_id>/                 # aquecimentos (excluídos da análise)
+  _pilot/<run_id>/                  # execução piloto (excluída da análise)
+  _invalid/                         # execuções invalidadas, com nota (nunca apagadas)
   <run_id>/                         # ex.: S6_r03_20261031T193916
     manifest.json                   # cenário, sementes, parâmetros, netem, versões, hardware, converged
     network_events.jsonl            # cada mudança de rede, com instantes antes/depois do comando
@@ -83,18 +85,24 @@ data/raw/
     client/  client.sqlite requests.jsonl client_events.jsonl client_state_hashes.json
              client_done.json generation_done.json client_info.json
     server/  server.sqlite server_requests.jsonl server_events.jsonl
-data/processed/                     # metrics_per_run.csv, summary_by_scenario.csv,
-                                    # comparisons_vs_S0.csv, alerts.txt, stats_info.json
+data/processed/                     # metrics_per_run.csv, summary_preliminary.csv, checks_report.md;
+                                    # (Ciclo 3) summary_by_scenario.csv, comparisons_vs_S0.csv,
+                                    # alerts.txt, stats_info.json
 data/figures/                       # PDF e PNG
 ```
 
 ## Como gerar métricas e gráficos
 
 ```bash
-python analysis/metrics.py --raw data/raw          # -> data/processed/metrics_per_run.csv
-python analysis/stats.py                           # -> resumo, comparações com S0 (Mann–Whitney + Holm), alertas
-python analysis/plots.py --raw data/raw            # -> data/figures/*.pdf, *.png
+python analysis/metrics.py --in data/raw --out data/processed     # metrics_per_run.csv + summary_preliminary.csv
+python analysis/plots.py   --in data/processed --raw data/raw --out data/figures   # PDF e PNG
+python analysis/checks.py  --raw data/raw --processed data/processed             # checks_report.md
+python analysis/stats.py                                          # só na bateria completa (Mann–Whitney + Holm)
 ```
+
+Rodada preliminar (Ciclo 2): `bash experiments/preliminary.sh pilot` e depois
+`bash experiments/preliminary.sh round`, dentro do WSL2. Passo a passo em [`PENDENCIAS.md`](PENDENCIAS.md);
+registro em [`EXECUTION_LOG.md`](EXECUTION_LOG.md).
 
 ## Mapa entre arquivos e métricas
 

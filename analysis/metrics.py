@@ -202,18 +202,68 @@ def write_csv(rows, out):
             writer.writerow({k: row[k] for k in COLUMNS})
 
 
+# Métricas resumidas por cenário em summary_preliminary.csv (R3 vem de `converged`).
+SUMMARY_METRICS = [c for c in COLUMNS if c not in ("run_id", "scenario", "repetition", "converged")]
+
+
+def scenario_key(s):
+    return (len(s), s)
+
+
+def preliminary_summary(rows):
+    """Por cenário e métrica: valores individuais (ordem de repetição), média, mínimo e máximo.
+
+    Com n = 3 o desvio padrão é pouco informativo; por isso os valores individuais aparecem.
+    """
+    by_sc = defaultdict(list)
+    for r in rows:
+        by_sc[r["scenario"]].append(r)
+    width = max((len(v) for v in by_sc.values()), default=0)
+    out = []
+    for sc in sorted(by_sc, key=scenario_key):
+        sc_rows = sorted(by_sc[sc], key=lambda r: (r["repetition"] is None, r["repetition"]))
+        r3 = sum(1 for r in sc_rows if not r["converged"]) / len(sc_rows) * 100
+        metrics = [("R3_pct", None)] + [(m, m) for m in SUMMARY_METRICS]
+        for name, col in metrics:
+            vals = [r3] if col is None else [float(r[col]) for r in sc_rows]
+            finite = [v for v in vals if not math.isnan(v)]
+            line = {"scenario": sc, "metric": name, "n": len(finite),
+                    "run_ids": ";".join(r["run_id"] for r in sc_rows) if col else ""}
+            for i in range(width):
+                line[f"value_{i + 1}"] = vals[i] if col is not None and i < len(vals) else ""
+            if col is None:
+                line["value_1"] = r3
+            line["mean"] = float(np.mean(finite)) if finite else NAN
+            line["min"] = min(finite) if finite else NAN
+            line["max"] = max(finite) if finite else NAN
+            out.append(line)
+    return out
+
+
+def write_rows(rows, path):
+    with open(path, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--raw", default="data/raw")
-    ap.add_argument("--out", default="data/processed/metrics_per_run.csv")
+    ap.add_argument("--in", "--raw", dest="raw", default="data/raw",
+                    help="diretório com as execuções (data/raw)")
+    ap.add_argument("--out", default="data/processed",
+                    help="diretório de saída (ou caminho de um .csv para metrics_per_run)")
     args = ap.parse_args(argv)
     runs = find_runs(args.raw)
     if not runs:
         print(f"nenhuma execução encontrada em {args.raw}", file=sys.stderr)
         return 1
+    out = Path(args.out)
+    out_dir, metrics_csv = (out.parent, out) if out.suffix == ".csv" else (out, out / "metrics_per_run.csv")
     rows = [compute_run_metrics(load_run(d)) for d in runs]
-    write_csv(rows, args.out)
-    print(f"{len(rows)} execuções -> {args.out}")
+    write_csv(rows, metrics_csv)
+    write_rows(preliminary_summary(rows), out_dir / "summary_preliminary.csv")
+    print(f"{len(rows)} execuções -> {metrics_csv} e {out_dir / 'summary_preliminary.csv'}")
     return 0
 
 

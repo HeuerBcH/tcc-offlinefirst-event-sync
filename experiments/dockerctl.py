@@ -159,5 +159,15 @@ class NetworkController:
                 fh.write(json.dumps(record, separators=(",", ":")) + "\n")
         return record
 
+    def mark(self, label, t_ns, spec):
+        """Registro sem comando tc (ex.: t0), com a condição de rede vigente."""
+        record = {"label": label, "spec": spec, "marker": True, "t_first_before_ns": t_ns,
+                  "t_applied_ns": t_ns, "commands": []}
+        self.records.append(record)
+        if self.log_path:
+            with open(self.log_path, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(record, separators=(",", ":")) + "\n")
+        return record
+
     def clear(self, label="clear"):
         return self.set(None, label)
