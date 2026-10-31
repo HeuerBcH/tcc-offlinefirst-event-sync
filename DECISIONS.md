@@ -108,3 +108,30 @@ Itens marcados **[CONFIRMAR]** precisam do aval do autor antes dos experimentos 
   7. Cada bateria grava `battery_<timestamp>.json` com as execuções, erros e o tempo real decorrido (fase 8).
   8. `--n-events` e `--no-warmup` existem só para testes do protótipo; o orquestrador avisa quando N ≠ 1000.
 - **Motivo:** plano, seções 6.4 e 6.5, nos pontos em que o plano deixa a implementação em aberto.
+
+## D-016 — Análise: definições operacionais das métricas
+- **Data:** 2026-10-31
+- **Decisão:**
+  1. **D2** só é calculado em execuções convergidas; nas demais fica vazio (NaN), e a falha entra em R3.
+  2. **D3:** as restaurações são os registros `restore` (S5/S6) e `online` (S7, S8, S10) de `network_events.jsonl`, no instante `t_applied_ns` (D-015). A fila é considerada não vazia em r se existe evento com `created_at_ns ≤ r` e `acked_at_ns` nulo ou `> r`. Restauração sem requisição `ok` posterior é ignorada. `D3_n` registra quantas restaurações entraram na média.
+  3. **D4** = N ÷ D2, com N = eventos em `client.events` (1000).
+  4. **D6:** na varredura, quando criação e ACK têm o mesmo instante, o ACK é processado primeiro.
+  5. **C1** conta `event_id` com status `APPLIED` em mais de uma linha de `server_requests.jsonl` (inclui requisições com resposta descartada).
+  6. Desvio padrão amostral (ddof = 1).
+- **Motivo:** plano, seção 7.1, nos pontos em que a definição deixa margem.
+
+## D-017 — Análise: métricas testadas e número de comparações [CONFIRMAR]
+- **Data:** 2026-10-31
+- **Decisão:** cada cenário S1–S10 é comparado com S0 (Mann–Whitney bilateral) nas métricas por execução R4, R5, D1 (mediana, p95 e máximo), D2, D3, D5 e D6, sempre que os dois grupos têm valores. D3 não existe em S0 e D4 só existe em S6, então nenhuma das duas entra em comparação (ambas são apenas descritas). R3 é por cenário e não é testada. A correção de Holm é aplicada sobre **todas** as comparações realizadas, e o número fica em `stats_info.json`. Com 11 cenários completos: 10 cenários × 8 métricas = 80 comparações. Quando os dois grupos têm todos os valores iguais (ex.: R5 = 0 em S0 e S1), o teste é indefinido; registra-se p = 1 com nota.
+- **Motivo:** o plano diz "cada métrica por execução" mas não lista quais; testar as três estatísticas de D1 aumenta as comparações e reduz o poder após Holm. O autor deve confirmar a lista de acordo com as hipóteses da Metodologia.
+- **R1, R2, C1, C3 e C4** não são testadas (valor esperado fixo). Qualquer desvio, execução não convergida, `APPLIED_IGNORED_CONFLICT`, `SEQ_ANOMALY` ou `QUEUE_FULL` gera alerta em `alerts.txt`.
+
+## D-018 — Gráficos
+- **Data:** 2026-10-31
+- **Decisão:** uma série por gráfico, na mesma cor (azul `#2a78d6`), com grade e eixos discretos. Boxplot de D1 em escala logarítmica (os cenários vão de dezenas de ms a dezenas de s). Barras de D2 e D3 com média ± desvio padrão. A série temporal da fila tem uma linha por execução, com o tempo relativo a t0.
+- **Motivo:** figuras para impressão em LaTeX (PDF vetorial + PNG).
+
+## Observações das execuções de aceite (fases 5–7)
+- **Data:** 2026-10-31
+- **S0, N = 1000** (Docker no WSL2): convergiu em 110 s de tempo real; R1 = 100%, R2 = 0, R4 = 1,0, R5 = 0%, C1 = C3 = C4 = 0, D1 mediana 18,5 ms, p95 27,0 ms, máx. 40,7 ms, D5 = 7,77, D6 = 1. Sem netem, D1 ≈ 18 ms vem principalmente das gravações duráveis do SQLite (vários commits com fsync por evento, no cliente e no servidor), e não da rede (RTT ≈ 0,1 ms). Vale descrever isso no texto ao interpretar D1.
+- **S9, N = 1000** (fase 6, descarte de resposta em Docker): o servidor descartou 68 de 901 respostas (7,5% realizados, com taxa configurada de 10%; sorteio com semente). O cliente registrou exatamente 68 `remote_disconnected`, reenviou, recebeu 83 `DUPLICATE` (C2) e terminou com C1 = 0, C3 = 0, C4 = 0, R1 = 100%.

@@ -1,0 +1,4 @@
+# Exceção às dependências registrada em DECISIONS.md (D-001). Versões usadas no desenvolvimento.
+numpy==2.3.4
+scipy==1.16.2
+matplotlib==3.10.7

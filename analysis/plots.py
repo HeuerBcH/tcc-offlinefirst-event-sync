@@ -1,0 +1,124 @@
+"""Gráficos para o texto do TCC (plano, seção 7.4), em PDF e PNG.
+
+    python analysis/plots.py [--raw data/raw] [--metrics data/processed/metrics_per_run.csv]
+                             [--out data/figures]
+
+- d1_median_boxplot: mediana de D1 por execução, por cenário;
+- d2_bars, d3_bars: média ± desvio padrão por cenário;
+- queue_<S6|S8>: tamanho da fila (criados − ACKED) ao longo do tempo, uma linha por execução.
+"""
+import argparse
+import math
+import sys
+from pathlib import Path
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from metrics import find_runs, load_run, queue_series  # noqa: E402
+from stats import load_rows, scenario_order, to_float  # noqa: E402
+
+SERIES = "#2a78d6"
+INK = "#0b0b0b"
+INK_2 = "#52514e"
+GRID = "#e4e3df"
+
+plt.rcParams.update({
+    "font.size": 9, "axes.edgecolor": INK_2, "axes.labelcolor": INK, "xtick.color": INK_2,
+    "ytick.color": INK_2, "axes.spines.top": False, "axes.spines.right": False,
+    "axes.grid": True, "axes.grid.axis": "y", "grid.color": GRID, "grid.linewidth": 0.6,
+    "axes.axisbelow": True, "savefig.bbox": "tight", "pdf.fonttype": 42,
+})
+
+
+def save(fig, out, name):
+    for ext in ("pdf", "png"):
+        fig.savefig(out / f"{name}.{ext}", dpi=200)
+    plt.close(fig)
+
+
+def per_scenario(rows, metric):
+    data = {}
+    for sc in scenario_order(rows):
+        v = [to_float(r[metric]) for r in rows if r["scenario"] == sc]
+        v = [x for x in v if not math.isnan(x)]
+        if v:
+            data[sc] = v
+    return data
+
+
+def boxplot(rows, out):
+    data = per_scenario(rows, "D1_median_ms")
+    if not data:
+        return
+    fig, ax = plt.subplots(figsize=(6, 3))
+    ax.boxplot(list(data.values()), tick_labels=list(data), widths=0.5, patch_artist=True,
+               boxprops={"facecolor": "#cde2fb", "edgecolor": SERIES, "linewidth": 1},
+               medianprops={"color": SERIES, "linewidth": 2},
+               whiskerprops={"color": SERIES}, capprops={"color": SERIES},
+               flierprops={"marker": "o", "markersize": 3, "markerfacecolor": SERIES,
+                           "markeredgecolor": "none"})
+    ax.set_yscale("log")
+    ax.set_xlabel("Cenário")
+    ax.set_ylabel("D1, mediana por execução (ms)")
+    ax.set_title("Escala logarítmica", loc="left", color=INK_2, fontsize=8)
+    save(fig, out, "d1_median_boxplot")
+
+
+def bars(rows, metric, ylabel, out, name):
+    data = per_scenario(rows, metric)
+    if not data:
+        return
+    labels = list(data)
+    means = [np.mean(v) for v in data.values()]
+    sds = [np.std(v, ddof=1) if len(v) > 1 else 0 for v in data.values()]
+    fig, ax = plt.subplots(figsize=(6, 3))
+    ax.bar(labels, means, width=0.6, color=SERIES, yerr=sds, capsize=3,
+           error_kw={"ecolor": INK_2, "elinewidth": 1})
+    ax.set_xlabel("Cenário")
+    ax.set_ylabel(ylabel)
+    save(fig, out, name)
+
+
+def queue_plot(raw, scenario, out):
+    runs = [d for d in find_runs(raw) if d.name.startswith(f"{scenario}_")]
+    if not runs:
+        return
+    fig, ax = plt.subplots(figsize=(6, 3))
+    for d in runs:
+        run = load_run(d)
+        t0 = run["manifest"]["timings"]["t0_ns"]
+        series = queue_series(run["events"])
+        t = [(p[0] - t0) / 1e9 for p in series]
+        size = [p[1] for p in series]
+        ax.step(t, size, where="post", color=SERIES, linewidth=1, alpha=0.6)
+    ax.set_xlabel("Tempo desde t0 (s)")
+    ax.set_ylabel("Eventos na fila (criados − ACKED)")
+    ax.set_title(f"{scenario}: tamanho da fila ({len(runs)} execuções)", loc="left", color=INK)
+    save(fig, out, f"queue_{scenario}")
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--raw", default="data/raw")
+    ap.add_argument("--metrics", default="data/processed/metrics_per_run.csv")
+    ap.add_argument("--out", default="data/figures")
+    args = ap.parse_args(argv)
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    rows = load_rows(args.metrics)
+    boxplot(rows, out)
+    bars(rows, "D2_s", "D2: tempo até esvaziar a fila (s)", out, "d2_bars")
+    bars(rows, "D3_s", "D3: tempo de retomada (s)", out, "d3_bars")
+    for sc in ("S6", "S8"):
+        queue_plot(args.raw, sc, out)
+    print(f"figuras em {out}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
