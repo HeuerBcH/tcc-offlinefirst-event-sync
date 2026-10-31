@@ -1,0 +1,17 @@
+{
+  "_comment": "Valores exatamente como na Metodologia, Quadro 3 (plano, seção 6.3). online = netem do estado online (null = sem netem). O estado offline é offline_spec.",
+  "offline_spec": "loss 100%",
+  "scenarios": {
+    "S0":  {"type": "constant", "online": null, "description": "sem netem"},
+    "S1":  {"type": "constant", "online": "delay 60ms 12ms distribution normal", "description": "latência moderada"},
+    "S2":  {"type": "constant", "online": "delay 500ms 100ms distribution normal", "description": "latência alta"},
+    "S3":  {"type": "constant", "online": "loss 5%", "description": "perda 5%"},
+    "S4":  {"type": "constant", "online": "loss 15%", "description": "perda 15%"},
+    "S5":  {"type": "initial_outage", "online": null, "outage_s": 30, "description": "loss 100% de t0 a t0+30 s; depois sem netem"},
+    "S6":  {"type": "initial_outage", "online": null, "outage_s": 600, "description": "loss 100% de t0 a t0+600 s; depois sem netem"},
+    "S7":  {"type": "cycles", "online": null, "online_s": 5, "offline_s": 5, "description": "ciclos 5 s online / 5 s loss 100%, começando online"},
+    "S8":  {"type": "cycles", "online": null, "online_s": 30, "offline_s": 30, "description": "ciclos 30 s online / 30 s loss 100%, começando online"},
+    "S9":  {"type": "constant", "online": null, "drop_response_rate": 0.10, "description": "sem netem; servidor descarta 10% das respostas"},
+    "S10": {"type": "cycles", "online": "delay 60ms 12ms distribution normal loss 5%", "online_s": 30, "offline_s": 30, "description": "online = delay 60ms 12ms normal + loss 5%; ciclos 30 s / 30 s, começando online"}
+  }
+}

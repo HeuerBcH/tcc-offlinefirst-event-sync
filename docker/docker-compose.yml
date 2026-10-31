@@ -1,6 +1,7 @@
 # Cliente e servidor em containers separados, numa rede bridge dedicada (plano, seção 6.1).
 # Uso direto: docker compose -f docker/docker-compose.yml up -d --build
-# Nos experimentos, quem sobe e derruba os containers é experiments/run_experiment.py.
+# Nos experimentos, os containers são criados por experiments/dockerctl.py com a CLI do docker
+# (mesmos parâmetros deste arquivo; ver DECISIONS.md, D-014). Mantenha os dois em sincronia.
 name: tccsync
 
 services:

@@ -9,7 +9,8 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-COMPOSE_FILE = ROOT / "docker" / "docker-compose.yml"
+IMAGE = "tcc-sync:latest"
+NETWORK = "tccsync_syncnet"
 CLIENT = "tcc-client"
 SERVER = "tcc-server"
 CONTAINERS = (CLIENT, SERVER)
@@ -27,9 +28,30 @@ def run(cmd, check=True, input=None, timeout=None, env=None):
     return proc
 
 
-def compose(*args, env=None, check=True, timeout=600):
-    return run(["docker", "compose", "-f", str(COMPOSE_FILE), *args], check=check, env=env,
-               timeout=timeout)
+# O ambiente é montado com a CLI do docker, sem depender do plugin compose (ausente no
+# Docker Engine nativo do WSL). Mesmos parâmetros de docker/docker-compose.yml (D-014).
+
+def build():
+    run(["docker", "build", "-t", IMAGE, "-f", str(ROOT / "docker" / "Dockerfile"), str(ROOT)],
+        timeout=1800)
+
+
+def down():
+    run(["docker", "rm", "-f", *CONTAINERS], check=False)
+    run(["docker", "network", "rm", NETWORK], check=False)
+
+
+def up(drop_response_rate=0.0, server_seed=0):
+    """Recria rede e containers (bancos vazios)."""
+    down()
+    run(["docker", "network", "create", "--driver", "bridge", NETWORK])
+    run(["docker", "run", "-d", "--name", SERVER, "--network", NETWORK, "--network-alias", "server",
+         "--cap-add", "NET_ADMIN",
+         "-e", "SYNC_DATA_DIR=/data", "-e", "SYNC_PORT=8080",
+         "-e", f"DROP_RESPONSE_RATE={drop_response_rate}", "-e", f"SERVER_SEED={server_seed}",
+         IMAGE, "python", "-m", "sync_server.main"])
+    run(["docker", "run", "-d", "--init", "--name", CLIENT, "--network", NETWORK,
+         "--network-alias", "client", "--cap-add", "NET_ADMIN", IMAGE, "sleep", "infinity"])
 
 
 def dexec(container, *cmd, input=None, check=True, timeout=None, interactive=False):
@@ -66,17 +88,20 @@ def netem_command(iface, spec):
 def container_clock_offset_ns(container, samples=5):
     """Estima (relógio do container − relógio do host) pelo ponto médio de docker exec.
 
-    No mesmo kernel o valor deve ser próximo de zero (a incerteza é metade da latência do exec).
+    A estimativa tem incerteza de metade da latência do exec. O teste decisivo é
+    `same_clock`: em todas as amostras a leitura do container cai entre os instantes antes e
+    depois do host, o que sempre vale quando o relógio é o mesmo.
     """
-    best = None
+    best, same_clock = None, True
     for _ in range(samples):
         before = time.time_ns()
         inside = int(dexec(container, "python", "-c", "import time; print(time.time_ns())").stdout)
         after = time.time_ns()
+        same_clock = same_clock and before <= inside <= after
         half = (after - before) // 2
         if best is None or half < best[1]:
             best = (inside - (before + half), half)
-    return {"offset_ns": best[0], "uncertainty_ns": best[1]}
+    return {"offset_ns": best[0], "uncertainty_ns": best[1], "same_clock": same_clock}
 
 
 class NetworkController:

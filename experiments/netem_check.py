@@ -95,7 +95,8 @@ def main():
     report = {"started_at_ns": time.time_ns(), "checks": {}, "passed": False}
     checks = report["checks"]
     print("Subindo containers...")
-    dc.compose("up", "-d", "--build", "--force-recreate")
+    dc.build()
+    dc.up()
     try:
         if not wait_health():
             raise dc.CommandError("servidor não respondeu a GET /health")
@@ -169,7 +170,7 @@ def main():
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(report, indent=2), encoding="utf-8")
         if not args.keep_up:
-            dc.compose("down", "--remove-orphans", check=False)
+            dc.down()
     print(json.dumps(checks, indent=2))
     print("PASSOU" if report["passed"] else "FALHOU: o host não suporta o ambiente. PARAR.")
     print(f"Relatório: {args.out}")
