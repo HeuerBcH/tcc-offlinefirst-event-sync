@@ -36,6 +36,9 @@ class SyncApp:
 class SyncRequestHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     server_version = "sync-server/1"
+    # TCP_NODELAY: sem isso, Nagle + ACK atrasado do cliente somam ~40 ms (ou 1 RTT extra
+    # com netem) a cada resposta. Ver DECISIONS.md, D-011.
+    disable_nagle_algorithm = True
 
     @property
     def app(self):
@@ -50,9 +53,9 @@ class SyncRequestHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-        self.wfile.flush()
+        # Cabeçalhos e corpo numa única escrita (um segmento TCP para respostas pequenas).
+        self._headers_buffer.append(b"\r\n" + body)
+        self.flush_headers()
 
     def do_GET(self):
         if self.path == "/health":

@@ -1,0 +1,37 @@
+# Cliente e servidor em containers separados, numa rede bridge dedicada (plano, seção 6.1).
+# Uso direto: docker compose -f docker/docker-compose.yml up -d --build
+# Nos experimentos, quem sobe e derruba os containers é experiments/run_experiment.py.
+name: tccsync
+
+services:
+  server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: tcc-sync:latest
+    container_name: tcc-server
+    command: ["python", "-m", "sync_server.main"]
+    environment:
+      SYNC_DATA_DIR: /data
+      SYNC_PORT: "8080"
+      DROP_RESPONSE_RATE: ${DROP_RESPONSE_RATE:-0}
+      SERVER_SEED: ${SERVER_SEED:-0}
+    cap_add: [NET_ADMIN]
+    networks: [syncnet]
+
+  client:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: tcc-sync:latest
+    container_name: tcc-client
+    # O cliente fica ocioso; cada execução é iniciada pelo orquestrador via docker exec.
+    command: ["sleep", "infinity"]
+    init: true
+    cap_add: [NET_ADMIN]
+    networks: [syncnet]
+    depends_on: [server]
+
+networks:
+  syncnet:
+    driver: bridge

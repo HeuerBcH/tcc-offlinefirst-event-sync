@@ -74,3 +74,19 @@ Itens marcados **[CONFIRMAR]** precisam do aval do autor antes dos experimentos 
   4. Código de saída: 0 = convergiu (gera `client_done.json`); 3 = interrompido por SIGTERM antes de convergir. Em ambos os casos `client_state_hashes.json` é gravado.
   5. Arquivos auxiliares além da seção 4.9: `client_info.json` (parâmetros efetivos e contagem real de operações por tipo), `generation_done.json` (t0 e último `created_at_ns`, lido pelo orquestrador para calcular t_ref) e `client.pid` (para o SIGTERM do orquestrador).
 - **Motivo:** o plano não cobre esses casos; as escolhas não alteram o protocolo.
+
+## D-011 — Servidor: TCP_NODELAY e resposta numa única escrita (correção de defeito)
+- **Data:** 2026-10-31
+- **Decisão:** o handler do servidor usa `disable_nagle_algorithm = True` (TCP_NODELAY) e envia cabeçalhos e corpo da resposta numa única escrita. O cliente já usa TCP_NODELAY (`http.client` liga por padrão) e já envia cabeçalhos e corpo juntos.
+- **Motivo:** a primeira execução do teste "netem funcional" mostrou 44 ms por requisição **sem** netem e +400 ms (em vez de +200 ms) com `delay 100ms` em cada sentido. Causa: `BaseHTTPRequestHandler` escrevia cabeçalhos e corpo separadamente; o Nagle segurava o corpo até o ACK atrasado do cliente (~40 ms), ou um RTT a mais com netem. Isso inflaria D1–D3 em todos os cenários. Depois da correção: 0,1 ms sem netem e +200,6 ms com o delay (teste passou).
+
+## D-012 — Docker: uma imagem para cliente e servidor
+- **Data:** 2026-10-31
+- **Decisão:** `docker/Dockerfile` (base `python:3.12-slim` + `iproute2`) contém os pacotes `sync_client` e `sync_server`; o compose cria dois containers a partir dela (`tcc-server` roda o servidor; `tcc-client` fica ocioso com `sleep infinity` e cada execução é iniciada por `docker exec`). Rede bridge dedicada `syncnet`, `cap_add: [NET_ADMIN]` nos dois. Os arquivos ficam em `/data` dentro de cada container (sem volume); container recriado = banco vazio.
+- **Motivo:** mesma versão de Python e do código nos dois lados; plano, seção 6.1.
+
+## D-013 — Host do autor: netem verificado; orquestrador deve rodar dentro do WSL2
+- **Data:** 2026-10-31
+- **Situação verificada (`experiments/netem_check.py`, ⚠ VERIFICAR das seções 6.1 e 11):** Windows 11 + Docker Desktop 29.7.2 com backend WSL2, kernel `6.6.114.1-microsoft-standard-WSL2`, `tc` iproute2-6.15.0. O `sch_netem` está disponível; a interface dos dois containers é `eth0` (detectada, não assumida). Delay +200,6 ms (esperado ~200); `loss 100%` → timeout em 10,01–10,02 s com conexão nova e com conexão keep-alive. Latência do `docker exec` a partir do Windows: 68–83 ms por comando.
+- **Decisão:** nos experimentos, o orquestrador **roda dentro de uma distribuição WSL2** (Ubuntu, com a integração do Docker Desktop habilitada), e não no Python do Windows. Cada execução mede a diferença entre o relógio do orquestrador e o de cada container (`clock_offset` no manifesto); o orquestrador recusa iniciar se a diferença passar de 5 ms (opção `--allow-clock-offset` para depuração).
+- **Motivo:** o plano assume que cliente, servidor e orquestrador compartilham o relógio do kernel. No Docker Desktop os containers usam o relógio da VM do WSL2, não o do Windows. Medido a partir do Windows, o offset foi de ~26 ms ± 39 ms, o que não serve para alinhar t0 e as mudanças de rede. Todas as distribuições WSL2 rodam na mesma VM e no mesmo kernel, então dentro do Ubuntu o relógio é o mesmo dos containers.
