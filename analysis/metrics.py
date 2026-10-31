@@ -263,7 +263,10 @@ def main(argv=None):
     rows = [compute_run_metrics(load_run(d)) for d in runs]
     write_csv(rows, metrics_csv)
     write_rows(preliminary_summary(rows), out_dir / "summary_preliminary.csv")
-    print(f"{len(rows)} execuções -> {metrics_csv} e {out_dir / 'summary_preliminary.csv'}")
+    from export_raw import export_all  # importação tardia: export_raw importa este módulo
+    export_all(args.raw, out_dir / "raw_csv")
+    print(f"{len(rows)} execuções -> {metrics_csv}, {out_dir / 'summary_preliminary.csv'} "
+          f"e dados brutos em CSV em {out_dir / 'raw_csv'}")
     return 0
 
 

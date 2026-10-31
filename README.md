@@ -16,6 +16,12 @@ condições de rede emuladas, gerando automaticamente os dados das 15 métricas 
   `tc netem` aplicado na saída de cada container pelo orquestrador.
 - **Análise** (`analysis/`): métricas por execução, estatística por cenário e gráficos.
 
+Diagrama da arquitetura (Artefato 5): [`docs/arquitetura.pdf`](docs/arquitetura.pdf) /
+[`.png`](docs/arquitetura.png), gerado por `docs/arquitetura.py`. Registro do ambiente (Artefato 6):
+[`docs/AMBIENTE.md`](docs/AMBIENTE.md).
+
+![Arquitetura](docs/arquitetura.png)
+
 Não é um produto: sem interface gráfica, autenticação, múltiplos tipos de entidade nem
 sincronização do servidor para o cliente. As decisões de projeto estão em [`DECISIONS.md`](DECISIONS.md).
 
@@ -94,7 +100,7 @@ data/figures/                       # PDF e PNG
 ## Como gerar métricas e gráficos
 
 ```bash
-python analysis/metrics.py --in data/raw --out data/processed     # metrics_per_run.csv + summary_preliminary.csv
+python analysis/metrics.py --in data/raw --out data/processed     # metrics_per_run.csv, summary_preliminary.csv, raw_csv/
 python analysis/plots.py   --in data/processed --raw data/raw --out data/figures   # PDF e PNG
 python analysis/checks.py  --raw data/raw --processed data/processed             # checks_report.md
 python analysis/stats.py                                          # só na bateria completa (Mann–Whitney + Holm)

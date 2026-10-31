@@ -9,6 +9,16 @@ rodada preliminar prontas, **nenhum experimento oficial rodado ainda**.
 
 ---
 
+## 0. Artefatos dos Passos 4 a 6
+
+- [x] Artefato 4: repositório Git + README.
+- [x] Artefato 5: diagrama da arquitetura (`docs/arquitetura.pdf`/`.png`).
+- [x] Artefato 6: scripts do experimento + registro do ambiente (`docs/AMBIENTE.md` e `manifest.json` de cada execução).
+- [ ] Artefato 7: dados brutos (`data/raw/`, e em CSV em `data/processed/raw_csv/`): sai da rodada.
+- [ ] Artefato 8: tabela (`summary_preliminary.csv`), gráficos (`data/figures/`) e **observações iniciais (escritas pelo autor)**.
+
+---
+
 ## A. Rodada preliminar (Ciclo 2, fase 8): o próximo passo
 
 ### A.1 Preparar o host (seção 3.1 do Plano do Passo 6)
