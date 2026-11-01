@@ -13,9 +13,13 @@ from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
-from scipy.stats import mannwhitneyu
+from scipy.stats import PermutationMethod, mannwhitneyu
 
 BASELINE = "S0"
+# Valor-p exato por permutação: com n_resamples acima do número de partições (C(20, 10) = 184756
+# para 10 + 10), o scipy enumera todas, e o p é exato também com empates. O padrão do scipy
+# (method="auto") usaria a aproximação normal com n >= 8 ou com empates (DECISIONS.md, D-023).
+EXACT = PermutationMethod(n_resamples=10**6)
 # Métricas testadas contra S0 (Mann–Whitney bilateral), por família = dimensão da pergunta de
 # pesquisa (DECISIONS.md, D-017). Holm é aplicado dentro de cada família. Descritas, não testadas:
 # D1 máximo (depende de um único evento), D3 (não existe em S0), D4 (só S6), R3 (por cenário).
@@ -97,7 +101,7 @@ def compare(rows, scope="family"):
                 # comparação continua na contagem do Holm (regra fixada antes da coleta, D-017).
                 stat, p, note = math.nan, 1.0, "valores idênticos nos dois grupos; p = 1"
             else:
-                res = mannwhitneyu(a, b, alternative="two-sided")
+                res = mannwhitneyu(a, b, alternative="two-sided", method=EXACT)
                 stat, p, note = float(res.statistic), float(res.pvalue), ""
             comparisons.append({
                 "family": FAMILY_OF[metric], "scenario": sc, "metric": metric,
@@ -167,7 +171,8 @@ def main(argv=None):
     (out / "alerts.txt").write_text(
         "\n".join(alert_lines) + ("\n" if alert_lines else "nenhum alerta\n"), encoding="utf-8")
     info = {
-        "test": "scipy.stats.mannwhitneyu(alternative='two-sided')",
+        "test": "scipy.stats.mannwhitneyu(alternative='two-sided', method=PermutationMethod(n_resamples=10**6)): "
+                "valor-p exato por enumeração de todas as permutações, válido com empates",
         "correction": "Holm (implementação própria, analysis/stats.py::holm)",
         "holm_scope": args.holm_scope,
         "hypotheses": "H0: a distribuição da métrica no cenário é igual à de S0; "

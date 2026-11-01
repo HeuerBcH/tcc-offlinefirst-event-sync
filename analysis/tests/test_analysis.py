@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from metrics import c3, c4, d3_values, queue_series, t_ref_ns  # noqa: E402
-from stats import FAMILIES, apply_holm, holm  # noqa: E402
+from stats import FAMILIES, apply_holm, compare, holm  # noqa: E402
 
 
 class HolmTest(unittest.TestCase):
@@ -38,6 +38,29 @@ class HolmFamilyTest(unittest.TestCase):
         self.assertEqual({c["holm_m"] for c in comps}, {2})
         apply_holm(comps, "all")  # mesmo exemplo do teste à mão acima
         self.assertEqual([round(c["p_holm"], 6) for c in comps], [0.03, 0.06, 0.06, 0.02])
+
+
+class ExactPValueTest(unittest.TestCase):
+    @staticmethod
+    def rows(s0, other):
+        rows = []
+        for sc, vals in (("S0", s0), ("S1", other)):
+            rows += [{"scenario": sc, "R4": str(v), **{m: "" for m in FAMILIES["confiabilidade"][1:]
+                                                       + FAMILIES["desempenho"] + FAMILIES["consistencia"]}}
+                     for v in vals]
+        return rows
+
+    def p_of(self, s0, other):
+        return [c for c in compare(self.rows(s0, other)) if c["metric"] == "R4"][0]["p"]
+
+    def test_minimum_p_n3_with_and_without_ties(self):
+        # 2 / C(6, 3) = 0,10, inclusive com empates dentro dos grupos (a aproximação normal daria 0,047).
+        self.assertAlmostEqual(self.p_of([1, 2, 3], [4, 5, 6]), 0.1)
+        self.assertAlmostEqual(self.p_of([0, 0, 0], [1, 1, 1]), 0.1)
+
+    def test_minimum_p_n10(self):
+        # 2 / C(20, 10) ≈ 1,08 × 10⁻⁵ (a aproximação normal daria ≈ 1,8 × 10⁻⁴).
+        self.assertAlmostEqual(self.p_of(list(range(10)), list(range(100, 110))), 2 / 184756)
 
 
 # Eventos no formato da consulta de metrics.load_run: (event_id, seq, created, acked, attempts, bytes)

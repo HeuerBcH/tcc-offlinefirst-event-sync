@@ -213,3 +213,15 @@ Itens marcados **[CONFIRMAR]** precisam do aval do autor antes dos experimentos 
      aplicação, o S7 não exercita o reenvio com backoff do mecanismo, porque o TCP resolve antes) e
      externa (as esperas dependem da pilha TCP do Linux e podem ser diferentes em celulares).
 - **Motivo:** decisão do autor, com apoio da orientação por IA, em 2026-11-01.
+
+## D-023 — Valor-p exato do Mann–Whitney (permutação completa)
+- **Data:** 2026-11-01 (antes do Ciclo 3)
+- **Fato:** a Metodologia (seção 4.9) afirma menor p exato de 2/C(6,3) = 0,10 (n = 3) e
+  2/C(20,10) ≈ 1,08 × 10⁻⁵ (n = 10). O `mannwhitneyu` com o padrão do scipy (`method="auto"`)
+  usa a aproximação normal com n ≥ 8 ou com empates: p mínimo ≈ 1,8 × 10⁻⁴ com n = 10, e
+  p = 0,047 para `[0,0,0]` × `[1,1,1]` com n = 3, o que contradiz o texto.
+- **Decisão:** `method=PermutationMethod(n_resamples=10**6)`. Como 10⁶ supera o número de partições
+  (184756 para 10 + 10), o scipy enumera todas e o valor-p é exato, condicional aos valores
+  observados, e válido com empates. O texto da Metodologia fica como está (agora corresponde ao código).
+  Empate total continua com p = 1 (D-017).
+- **Teste:** `analysis/tests/test_analysis.py` (`ExactPValueTest`).
