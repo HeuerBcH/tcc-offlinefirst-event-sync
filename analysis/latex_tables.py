@@ -11,7 +11,7 @@ Lê metrics_per_run.csv e grava, em <out>/:
 Cada célula traz a média e, entre parênteses, o mínimo e o máximo das execuções (com n = 3, o
 desvio padrão pouco informa). Requer \\usepackage{booktabs} e \\usepackage{graphicx} no preâmbulo. Decimais com vírgula.
 As legendas só descrevem o conteúdo; a interpretação fica no texto. Abaixo de cada tabela vem a
-linha de fonte (SOURCE) e depois a nota.
+linha de fonte (macro \\fonteautor do modelo, SOURCE) e depois a nota.
 """
 import argparse
 import csv
@@ -22,7 +22,8 @@ from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = "Fonte: Elaborado pelo autor."
+# Macro do modelo do TCC no Overleaf ("Fonte: Elaborado pelo autor"), igual à dos quadros e figuras.
+SOURCE = "\\fonteautor"
 
 
 def scenario_key(s):
@@ -92,8 +93,8 @@ def table(caption, label, header, body, note, colspec, fit_width=True):
         "\\bottomrule",
         "\\end{tabular}" + ("}" if fit_width else ""),
         "",
-        f"\\par\\smallskip\\footnotesize {SOURCE}",
-        f"\\par {note}",
+        SOURCE,
+        f"\\par\\smallskip{{\\footnotesize Nota: {note}\\par}}",
         "\\end{table}",
         "",
     ]
