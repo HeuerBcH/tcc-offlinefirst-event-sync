@@ -18,16 +18,20 @@ EXECUTION_LOG.md"), gerado por `analysis/checks.py`.
 
 ## 2. Host
 
-Valores levantados em 2026-10-31 (confirmar com o `manifest.json` do piloto, campo `host`).
+Valores levantados em 2026-10-31. Conferidos em 2026-11-01 com o `manifest.json` do piloto (campos
+`host`, `docker_version`, `python_version`, `tc_version`): iguais, e iguais nos 45 manifestos
+(33 execuções, 11 aquecimentos, piloto), todos com o commit `011052c` e `git_dirty: false`. SO do
+Windows, versão do Ubuntu, memória física e Python da análise não estão no manifesto; foram
+conferidos direto no host na mesma data.
 
 | Item | Valor |
 |---|---|
 | SO | Windows 11 Pro 10.0.26200; experimentos dentro do WSL2 (Ubuntu 24.04.2 LTS) |
 | Kernel (containers e orquestrador) | `6.6.114.1-microsoft-standard-WSL2` |
-| CPU | 12th Gen Intel Core i7-12700F, 20 threads |
-| Memória | 16 GB (MemTotal no WSL2: 16299064 kB) |
+| CPU | 12th Gen Intel Core i7-12700F, 12 núcleos (8P + 4E), 20 threads |
+| Memória | 32 GB no host; o WSL2 (onde rodam orquestrador e containers) enxerga 16 GB (MemTotal 16299064 kB, limite padrão do WSL2) |
 | Docker | Docker Engine nativo do WSL2, 29.1.3 (cliente e servidor) |
-| Python | orquestrador 3.12.3 (WSL); containers 3.12.16 (`python:3.12-slim`); análise 3.13 no Windows |
+| Python | orquestrador 3.12.3 (WSL); containers 3.12.16 (`python:3.12-slim`); análise 3.13.14 no Windows |
 | tc | iproute2-6.15.0 |
 
 ## 3. Checklist antes de começar (seção 3.1)

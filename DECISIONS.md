@@ -144,7 +144,8 @@ Itens marcados **[CONFIRMAR]** precisam do aval do autor antes dos experimentos 
 - **Implementação:** `analysis/stats.py` (`FAMILIES`, `apply_holm`); saída com `family`,
   `holm_group`, `holm_m` e `p_holm` em `comparisons_vs_S0.csv`; regras em `stats_info.json`.
   Teste em `analysis/tests/test_analysis.py` (`HolmFamilyTest`).
-- **Pendente no texto:** registrar a mesma regra na seção 4.8 da Metodologia (Overleaf) antes do Ciclo 3.
+- **Texto:** RESOLVIDO. A mesma regra está escrita na seção 4.9 da Metodologia (Overleaf), antes do
+  Ciclo 3 (registrado em 2026-11-01).
 - **Motivo:** decisão do autor, com apoio da orientação por IA, em 2026-11-01.
 
 ## D-018 — Gráficos

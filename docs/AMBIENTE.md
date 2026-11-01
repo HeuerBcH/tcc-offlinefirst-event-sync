@@ -8,8 +8,8 @@ Levantamento: 2026-10-31.
 
 | Item | Valor |
 |---|---|
-| CPU | 12th Gen Intel Core i7-12700F, 20 threads |
-| Memória | 16 GB (16299064 kB visíveis no WSL2) |
+| CPU | 12th Gen Intel Core i7-12700F, 12 núcleos (8P + 4E), 20 threads |
+| Memória | 32 GB no host; 16 GB visíveis no WSL2 (16299064 kB; limite padrão do WSL2, sem `.wslconfig`) |
 | SO do host | Windows 11 Pro 10.0.26200 |
 | Ambiente Linux | WSL2, Ubuntu 24.04.2 LTS, kernel `6.6.114.1-microsoft-standard-WSL2` |
 | Docker | Docker Engine nativo do WSL2, 29.1.3 (cliente e servidor); sem compose (DECISIONS.md, D-014) |
@@ -22,7 +22,7 @@ Levantamento: 2026-10-31.
 | Imagem dos containers | `python:3.12-slim` + `iproute2` → Python 3.12.16, `tc` iproute2-6.15.0 |
 | Orquestrador | Python 3.12.3 (WSL2), só biblioteca padrão |
 | Cliente e servidor | só biblioteca padrão (`sqlite3`, `http.client`, `http.server`) |
-| Análise | Python 3.13 (Windows) com numpy 2.3.4, scipy 1.16.2, matplotlib 3.10.7 (`analysis/requirements.txt`) |
+| Análise | Python 3.13.14 (Windows) com numpy 2.3.4, scipy 1.16.2, matplotlib 3.10.7 (`analysis/requirements.txt`) |
 
 ## Rede
 

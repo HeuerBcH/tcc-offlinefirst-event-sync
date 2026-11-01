@@ -124,8 +124,7 @@ python analysis/checks.py  --raw data/raw --processed data/processed
 
 - [x] **D-017: métricas testadas e correção** (decidido em 2026-11-01): R4, R5, D1 mediana,
       D1 p95, D2, D5, D6 e C2; Holm por família (confiabilidade 20, desempenho 50, consistência 10).
-      Implementado em `stats.py`. **Falta:** escrever a mesma regra na seção 4.8 da Metodologia
-      (Overleaf) antes do Ciclo 3.
+      Implementado em `stats.py`; regra escrita na seção 4.9 da Metodologia (Overleaf).
 - [ ] **Critérios operacionais do `checks.py` (D-020, item 7).** "S2/S4 maior que S0" = o menor
       valor do cenário é maior que o maior valor de S0; "D6 muito menor que 1000" = D6 ≤ 100.
       Confirmar ou trocar (as constantes estão no início de `analysis/checks.py`).
@@ -149,7 +148,7 @@ python analysis/checks.py  --raw data/raw --processed data/processed
 - [ ] **S7 no texto (D-022):** relatar a previsão original ("R5 > 0") e que não se confirmou;
       apresentar como achado (interrupção mais curta que o timeout → latência em D1, não falha em
       R5), com o contraste S7 × S8; ameaças à validade de construto e externa.
-- [ ] **Seção 4.8 da Metodologia:** métricas testadas, famílias, hipóteses H0/H1 genéricas, regra
+- [x] **Seção 4.9 da Metodologia:** métricas testadas, famílias, hipóteses H0/H1 genéricas, regra
       de empates e limitação do controle por família (D-017).
 
 - [ ] **Ciclo de vida do evento** (D-021): "criado → salvo localmente → enviado → confirmado →
@@ -159,6 +158,9 @@ python analysis/checks.py  --raw data/raw --processed data/processed
 - [ ] **Tempo de execução:** medido 1 h 57 min para 44 execuções; projeção de ~5,3 h para o Ciclo 3
       (a Metodologia estimava 8–10 h).
 - [ ] **Tabelas LaTeX** (`data/tables/*.tex`): exigem `\usepackage{booktabs}` e `\usepackage{graphicx}`.
+      Cada uma traz "Fonte: Elaborado pelo autor." e a nota; desempenho em duas tabelas
+      (`tab:desempenho-latencia`: D1; `tab:desempenho-recuperacao`: D2–D6). Gere de novo com
+      `latex_tables.py` em vez de editar à mão no Overleaf, para não perder ajustes.
 
 - [ ] **Jitter do netem:** "60 ms ± 12 ms" com `distribution normal` significa média de 60 ms e
       parâmetro de variação de 12 ms, não um intervalo fechado (plano do protótipo, seção 6.2).
@@ -166,7 +168,8 @@ python analysis/checks.py  --raw data/raw --processed data/processed
 - [ ] **Tamanho do payload** (D-007/D-019): fixo por campo, não por tipo de operação. CREATE =
       172 bytes; DELETE = 2; UPDATE = 76 (`title`), 82 (`description`) ou 16 (`value`).
 - [ ] **Ambiente real:** Windows 11 + WSL2 (Ubuntu 24.04, kernel 6.6.114.1-microsoft-standard-WSL2),
-      Docker Engine nativo no WSL2, cliente e servidor no mesmo host, i7-12700F, 16 GB. Se a
+      Docker Engine nativo no WSL2, cliente e servidor no mesmo host, i7-12700F (12 núcleos, 20 threads), 32 GB no host,
+      dos quais o WSL2 enxerga 16 GB (limite padrão do WSL2, metade da memória). Se a
       Metodologia fala em "host Linux", ajustar ou explicar que o WSL2 é uma VM Linux leve.
 - [ ] **Relógio compartilhado:** orquestrador e containers no mesmo kernel (WSL2), verificado
       a cada execução (D-013).

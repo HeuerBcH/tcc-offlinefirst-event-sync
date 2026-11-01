@@ -5,11 +5,13 @@
 Lê metrics_per_run.csv e grava, em <out>/:
   tabela_cenarios.tex        cenários e condição de rede (experiments/scenarios.json)
   tabela_confiabilidade.tex  R1, R2, R3, R4, R5
-  tabela_desempenho.tex      D1 (mediana, p95, máximo), D2, D3, D4, D5, D6
+  tabela_desempenho_latencia.tex     D1 (mediana, p95, máximo)
+  tabela_desempenho_recuperacao.tex  D2, D3, D4, D5, D6
   tabela_consistencia.tex    C1, C2, C3, C4
 Cada célula traz a média e, entre parênteses, o mínimo e o máximo das execuções (com n = 3, o
 desvio padrão pouco informa). Requer \\usepackage{booktabs} e \\usepackage{graphicx} no preâmbulo. Decimais com vírgula.
-As legendas só descrevem o conteúdo; a interpretação fica no texto.
+As legendas só descrevem o conteúdo; a interpretação fica no texto. Abaixo de cada tabela vem a
+linha de fonte (SOURCE) e depois a nota.
 """
 import argparse
 import csv
@@ -20,6 +22,7 @@ from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+SOURCE = "Fonte: Elaborado pelo autor."
 
 
 def scenario_key(s):
@@ -89,7 +92,8 @@ def table(caption, label, header, body, note, colspec, fit_width=True):
         "\\bottomrule",
         "\\end{tabular}" + ("}" if fit_width else ""),
         "",
-        f"\\par\\smallskip\\footnotesize {note}",
+        f"\\par\\smallskip\\footnotesize {SOURCE}",
+        f"\\par {note}",
         "\\end{table}",
         "",
     ]
@@ -153,15 +157,24 @@ def main(argv=None):
     body = []
     for sc, rows in by_sc.items():
         body.append([sc, cell(col(rows, "D1_median_ms")), cell(col(rows, "D1_p95_ms")),
-                     cell(col(rows, "D1_max_ms")), cell(col(rows, "D2_s"), 2), cell(col(rows, "D3_s"), 2),
+                     cell(col(rows, "D1_max_ms"))])
+    (out / "tabela_desempenho_latencia.tex").write_text(table(
+        "Métricas de desempenho por cenário: latência de sincronização por evento (D1)",
+        "tab:desempenho-latencia",
+        ["Cenário", "D1 mediana (ms)", "D1 p95 (ms)", "D1 máximo (ms)"],
+        body, note, "lrrr", fit_width=False), encoding="utf-8")
+
+    body = []
+    for sc, rows in by_sc.items():
+        body.append([sc, cell(col(rows, "D2_s"), 2), cell(col(rows, "D3_s"), 2),
                      cell(col(rows, "D4_events_per_s"), 1), cell(col(rows, "D5"), 2),
                      cell(col(rows, "D6"), integer=True)])
-    (out / "tabela_desempenho.tex").write_text(table(
-        "Métricas de desempenho por cenário", "tab:desempenho",
-        ["Cenário", "D1 med. (ms)", "D1 p95 (ms)", "D1 máx. (ms)", "D2 (s)", "D3 (s)", "D4 (ev./s)",
-         "D5", "D6 (eventos)"],
+    (out / "tabela_desempenho_recuperacao.tex").write_text(table(
+        "Métricas de desempenho por cenário: convergência, recuperação, vazão, overhead e fila (D2--D6)",
+        "tab:desempenho-recuperacao",
+        ["Cenário", "D2 (s)", "D3 (s)", "D4 (ev./s)", "D5", "D6 (eventos)"],
         body, note + " D3 só existe nos cenários com restauração da rede (S5--S8, S10); D4 só em S6. "
-        "``--'' indica métrica não aplicável ao cenário.", "lrrrrrrrr"), encoding="utf-8")
+        "``--'' indica métrica não aplicável ao cenário.", "lrrrrr"), encoding="utf-8")
 
     body = []
     for sc, rows in by_sc.items():
