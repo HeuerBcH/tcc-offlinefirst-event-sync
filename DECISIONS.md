@@ -156,3 +156,11 @@ Itens marcados **[CONFIRMAR]** precisam do aval do autor antes dos experimentos 
   7. **`checks.py`** (seção 4 do plano). Critérios operacionais que o plano não fixa: "S2 maior que S0" e "S4 maior que S0" = o menor valor do cenário é maior que o maior valor de S0 (comparação descritiva, sem teste). "D6 muito menor que 1000" em S2 = D6 ≤ 100 (10% de N) em todas as execuções. Em S6, o limite de D3 usa a latência medida da mudança `restore` daquela execução. Os critérios são escolhas do agente, estão escritos no relatório e podem ser trocados pelo autor (ver `PENDENCIAS.md`).
   8. `stats.py` não é executado na rodada preliminar (n = 3: o menor p exato bilateral do Mann–Whitney é 0,10).
 - **Motivo:** Plano do Passo 6, seções 3, 4 e 7.
+
+## D-021 — Escopo ampliado do Ciclo 2 e ciclo de vida do evento (decisões do autor)
+- **Data:** 2026-10-31
+- **Decisão (autor):**
+  1. **Todos os 11 cenários no Ciclo 2.** Depois da rodada preliminar do plano (S0, S2, S4, S6, S7, S9 × 3 + aquecimentos), roda-se uma rodada complementar com S1, S3, S5, S8 e S10 × 3 + aquecimentos, com o **mesmo commit** e o mesmo procedimento, para cumprir "todos os cenários experimentais definidos executados". O código não é alterado entre as duas rodadas.
+  2. **N fixo em 1000 no Ciclo 2.** O volume é tratado como *volume de eventos acumulados*, controlado pela duração da desconexão e medido pelo D6 (ex.: S5 ≈ 300, S6 = 1000). "S6 com N variado" (mesma desconexão, volumes diferentes, isolando o efeito do volume) fica como opção para o Ciclo 3, a confirmar com o orientador.
+  3. **Ciclo de vida do evento no texto:** criado → salvo localmente (PENDING) → enviado (IN_FLIGHT) → confirmado (ACKED) → **removível**. No protótipo, os eventos confirmados são mantidos durante os experimentos para auditoria (plano do protótipo, seção 4.2).
+- **Motivo:** respostas do autor em 2026-10-31.

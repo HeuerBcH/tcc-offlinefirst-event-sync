@@ -17,7 +17,8 @@ condições de rede emuladas, gerando automaticamente os dados das 15 métricas 
 - **Análise** (`analysis/`): métricas por execução, estatística por cenário e gráficos.
 
 Diagrama da arquitetura (Artefato 5): [`docs/arquitetura.pdf`](docs/arquitetura.pdf) /
-[`.png`](docs/arquitetura.png), gerado por `docs/arquitetura.py`. Registro do ambiente (Artefato 6):
+[`.png`](docs/arquitetura.png), gerado por `docs/arquitetura.py`. Diagrama de sequência (Artefato 1): [`docs/sequencia.pdf`](docs/sequencia.pdf) /
+[`.png`](docs/sequencia.png). Registro do ambiente (Artefato 6):
 [`docs/AMBIENTE.md`](docs/AMBIENTE.md).
 
 ![Arquitetura](docs/arquitetura.png)
@@ -104,6 +105,7 @@ python analysis/metrics.py --in data/raw --out data/processed     # metrics_per_
 python analysis/plots.py   --in data/processed --raw data/raw --out data/figures   # PDF e PNG
 python analysis/checks.py  --raw data/raw --processed data/processed             # checks_report.md
 python analysis/stats.py                                          # só na bateria completa (Mann–Whitney + Holm)
+python analysis/latex_tables.py --in data/processed --out data/tables   # tabelas .tex para o Overleaf
 ```
 
 Rodada preliminar (Ciclo 2): `bash experiments/preliminary.sh pilot` e depois
