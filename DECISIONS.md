@@ -120,11 +120,32 @@ Itens marcados **[CONFIRMAR]** precisam do aval do autor antes dos experimentos 
   6. Desvio padrão amostral (ddof = 1).
 - **Motivo:** plano, seção 7.1, nos pontos em que a definição deixa margem.
 
-## D-017 — Análise: métricas testadas e número de comparações [CONFIRMAR]
-- **Data:** 2026-10-31
-- **Decisão:** cada cenário S1–S10 é comparado com S0 (Mann–Whitney bilateral) nas métricas por execução R4, R5, D1 (mediana, p95 e máximo), D2, D3, D5 e D6, sempre que os dois grupos têm valores. D3 não existe em S0 e D4 só existe em S6, então nenhuma das duas entra em comparação (ambas são apenas descritas). R3 é por cenário e não é testada. A correção de Holm é aplicada sobre **todas** as comparações realizadas, e o número fica em `stats_info.json`. Com 11 cenários completos: 10 cenários × 8 métricas = 80 comparações. Quando os dois grupos têm todos os valores iguais (ex.: R5 = 0 em S0 e S1), o teste é indefinido; registra-se p = 1 com nota.
-- **Motivo:** o plano diz "cada métrica por execução" mas não lista quais; testar as três estatísticas de D1 aumenta as comparações e reduz o poder após Holm. O autor deve confirmar a lista de acordo com as hipóteses da Metodologia.
-- **R1, R2, C1, C3 e C4** não são testadas (valor esperado fixo). Qualquer desvio, execução não convergida, `APPLIED_IGNORED_CONFLICT`, `SEQ_ANOMALY` ou `QUEUE_FULL` gera alerta em `alerts.txt`.
+## D-017 — Análise: métricas testadas, famílias e correção de Holm [CONFIRMADO, revisado em 2026-11-01]
+- **Data:** 2026-10-31 (proposta); 2026-11-01 (decisão do autor, fixada **antes** do Ciclo 3)
+- **Decisão:**
+  1. **Métricas testadas contra S0** (Mann–Whitney bilateral), em todos os cenários S1–S10, sem
+     restrição por cenário: **R4, R5, D1 mediana, D1 p95, D2, D5, D6 e C2**. São 8 métricas × 10 cenários = **80 comparações**.
+  2. **Correção de Holm por família**, uma família por dimensão da pergunta de pesquisa:
+     confiabilidade (R4, R5: 20 comparações); desempenho (D1 mediana, D1 p95, D2, D5, D6: 50);
+     consistência (C2: 10). O controle do erro vale dentro de cada família, não sobre as 80 somadas;
+     isso é declarado como limitação. Alternativa mais conservadora, também defensável:
+     `stats.py --holm-scope all`. O padrão é `family`.
+  3. **Hipóteses genéricas**, iguais para todas as métricas: H0, a distribuição da métrica no
+     cenário é igual à de S0; H1, é diferente (bilateral). As expectativas de direção por cenário
+     (verificações de coerência do `checks.py`) só apoiam a interpretação; não são hipóteses testadas.
+  4. **Empate total** (ex.: R5 = 0 nos dois grupos): p = 1, mantido na contagem do Holm.
+  5. **Fora do teste (só descritivas):** D1 máximo (depende de um único evento; no S0 do Ciclo 2
+     variou de 223 a 348 ms), D3 (não existe em S0), D4 (só S6), R3 (por cenário).
+     R1, R2, C1, C3 e C4 continuam apenas verificadas (valor esperado fixo).
+  6. **C2 entra** porque é a única métrica de consistência que varia entre cenários e mede o
+     acionamento da idempotência; sem ela, a dimensão consistência ficaria sem teste.
+  7. **D5 fica:** a Metodologia trata o resultado como o custo de manter as garantias, e o overhead
+     de bytes é uma das faces desse custo.
+- **Implementação:** `analysis/stats.py` (`FAMILIES`, `apply_holm`); saída com `family`,
+  `holm_group`, `holm_m` e `p_holm` em `comparisons_vs_S0.csv`; regras em `stats_info.json`.
+  Teste em `analysis/tests/test_analysis.py` (`HolmFamilyTest`).
+- **Pendente no texto:** registrar a mesma regra na seção 4.8 da Metodologia (Overleaf) antes do Ciclo 3.
+- **Motivo:** decisão do autor, com apoio da orientação por IA, em 2026-11-01.
 
 ## D-018 — Gráficos
 - **Data:** 2026-10-31
@@ -164,3 +185,30 @@ Itens marcados **[CONFIRMAR]** precisam do aval do autor antes dos experimentos 
   2. **N fixo em 1000 no Ciclo 2.** O volume é tratado como *volume de eventos acumulados*, controlado pela duração da desconexão e medido pelo D6 (ex.: S5 ≈ 300, S6 = 1000). "S6 com N variado" (mesma desconexão, volumes diferentes, isolando o efeito do volume) fica como opção para o Ciclo 3, a confirmar com o orientador.
   3. **Ciclo de vida do evento no texto:** criado → salvo localmente (PENDING) → enviado (IN_FLIGHT) → confirmado (ACKED) → **removível**. No protótipo, os eventos confirmados são mantidos durante os experimentos para auditoria (plano do protótipo, seção 4.2).
 - **Motivo:** respostas do autor em 2026-10-31.
+
+## D-022 — S7: previsão original refutada e expectativa revisada (registrada após o Ciclo 2)
+- **Data:** 2026-11-01
+- **Fato:** o plano previa "S7: R5 > 0" (a janela de 5 s seria menor que o timeout de 10 s). No
+  Ciclo 2, R5 = 0% nas 3 execuções. Em cada uma das 10 janelas offline de cada execução havia uma
+  requisição em andamento; as 30 terminaram `ok`, com duração de 6,4 a 6,9 s (< T = 10 s).
+  Contraste no mesmo ciclo: S8 (janelas de 30 s) teve R5 ≈ 1,0% nas 3 execuções e S10 ≈ 2,2–2,5%.
+- **Decisão (autor):**
+  1. **Apresentar como achado.** A previsão original **não é apagada**: o texto relata a previsão
+     e que ela não se confirmou.
+  2. **Não mudar o cenário** (seria ajuste *post hoc*; S8 e S10 já cobrem janelas offline mais
+     longas que o timeout).
+  3. **Expectativa revisada para o Ciclo 3, registrada depois de ver os dados preliminares:** S7,
+     R5 = 0 (a interrupção aparece como latência em D1); S8, R5 > 0 (a interrupção passa do timeout).
+     O `checks.py` mantém a verificação original (marcada como refutada no Ciclo 2) e acrescenta as
+     duas revisadas, identificadas como revisadas após o Ciclo 2.
+  4. **Explicação pelo TCP é hipótese** até ser confirmada: as retransmissões com espera dobrando
+     (≈ 0,2 · 0,4 · 0,8 · 1,6 · 3,2 s, acumulado ≈ 6,2 s) são compatíveis com as durações de 6,4–6,9 s.
+     Sem confirmação, o texto usa "explicação compatível com os tempos medidos". Para confirmar:
+     execução diagnóstica do S7, fora do conjunto de dados, com `tcpdump` no container do cliente
+     (melhor) ou com contadores de retransmissão do kernel (`nstat`) antes e depois.
+     Fontes: RFC 6298 (dobra do RTO); o RTO mínimo de 200 ms do Linux precisa de fonte própria
+     (documentação ou código do kernel), ainda não conferida.
+  5. **Ameaças à validade:** de construto (com janelas offline mais curtas que o timeout da
+     aplicação, o S7 não exercita o reenvio com backoff do mecanismo, porque o TCP resolve antes) e
+     externa (as esperas dependem da pilha TCP do Linux e podem ser diferentes em celulares).
+- **Motivo:** decisão do autor, com apoio da orientação por IA, em 2026-11-01.

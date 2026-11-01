@@ -122,20 +122,21 @@ python analysis/checks.py  --raw data/raw --processed data/processed
 
 ## B. Decisões ainda abertas [CONFIRMAR]
 
-- [ ] **D-017 — métricas testadas contra S0 na bateria completa.** Hoje: R4, R5, D1 (mediana,
-      p95 e máximo), D2, D3, D5 e D6, o que dá 80 comparações com Holm. Confirmar ou reduzir a
-      lista de acordo com as hipóteses da Metodologia (ex.: só a mediana e o p95 de D1). Precisa
-      estar decidido **antes** do Ciclo 3.
+- [x] **D-017: métricas testadas e correção** (decidido em 2026-11-01): R4, R5, D1 mediana,
+      D1 p95, D2, D5, D6 e C2; Holm por família (confiabilidade 20, desempenho 50, consistência 10).
+      Implementado em `stats.py`. **Falta:** escrever a mesma regra na seção 4.8 da Metodologia
+      (Overleaf) antes do Ciclo 3.
 - [ ] **Critérios operacionais do `checks.py` (D-020, item 7).** "S2/S4 maior que S0" = o menor
       valor do cenário é maior que o maior valor de S0; "D6 muito menor que 1000" = D6 ≤ 100.
       Confirmar ou trocar (as constantes estão no início de `analysis/checks.py`).
-- [ ] **Dedução "S7: R5 > 0" (seção 4.3 do plano): NÃO CONFIRMADA na rodada (R5 = 0% nas 3 execuções).** Ponto a examinar antes de interpretar:
-      a dedução supõe que uma requisição enviada na janela offline de 5 s falha. Mas o TCP
-      retransmite (≈ 0,2 · 0,6 · 1,4 · 3,0 · 6,2 s após o envio) e uma retransmissão pode chegar
-      depois da volta da rede, ainda dentro do timeout de 10 s. Na execução de teste de S7 com
-      N = 100 (não oficial) todas as 54 requisições terminaram `ok`. Se a rodada der R5 = 0 em
-      S7, isso aparece como NÃO CONFIRMADA; cabe ao autor decidir se a dedução ou o texto
-      precisam mudar.
+- [x] **S7: tratamento decidido (D-022):** achado; previsão original mantida e relatada como
+      refutada; cenário não muda; expectativas revisadas (S7 R5 = 0, S8 R5 > 0) registradas e
+      verificadas no `checks.py`.
+- [ ] **Opcional: confirmar a explicação pelo TCP** com uma execução diagnóstica do S7 fora do
+      conjunto de dados (`tcpdump` no container do cliente, ou `nstat` antes e depois). Sem isso,
+      o texto diz "explicação compatível com os tempos medidos".
+- [ ] **Fonte do RTO mínimo de 200 ms do Linux** (documentação ou código do kernel), se o
+      texto citar os valores; a dobra do RTO está no RFC 6298.
 - [ ] Revisar e dar aceite geral às demais decisões do `DECISIONS.md` que mexem no desenho:
       D-008 (t0 absoluto, 3 s após o comando), D-009 (timeout por operação de socket), D-010
       (resposta com `REJECTED_GAP` não conta como falha), D-015 (cálculo de t_ref e do limite),
@@ -144,6 +145,12 @@ python analysis/checks.py  --raw data/raw --processed data/processed
 ---
 
 ## C. Ajustes no texto do TCC (Metodologia e Resultados)
+
+- [ ] **S7 no texto (D-022):** relatar a previsão original ("R5 > 0") e que não se confirmou;
+      apresentar como achado (interrupção mais curta que o timeout → latência em D1, não falha em
+      R5), com o contraste S7 × S8; ameaças à validade de construto e externa.
+- [ ] **Seção 4.8 da Metodologia:** métricas testadas, famílias, hipóteses H0/H1 genéricas, regra
+      de empates e limitação do controle por família (D-017).
 
 - [ ] **Ciclo de vida do evento** (D-021): "criado → salvo localmente → enviado → confirmado →
       removível; mantido durante os experimentos para auditoria".

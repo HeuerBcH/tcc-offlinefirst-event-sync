@@ -289,8 +289,17 @@ def main(argv=None):
              lambda: all(d3 <= lim for _, d3, lim, _ in s6_rows),
              lambda: "; ".join(f"{rid}: D3 = {fmt(d3)} s, limite = 10 + 30 + {fmt(lat)} = {fmt(lim)} s"
                                for rid, d3, lim, lat in s6_rows))
-    coherent("S7: R5 > 0", ["S7"], lambda: all(v > 0 for v in vals("S7", "R5_pct")),
+    coherent("S7: R5 > 0 (previsão original; refutada no Ciclo 2)", ["S7"],
+             lambda: all(v > 0 for v in vals("S7", "R5_pct")),
              lambda: f"R5 (%) por execução: {lst(vals('S7', 'R5_pct'))}")
+    # Expectativas revisadas DEPOIS dos dados do Ciclo 2 (D-022): janelas offline mais curtas
+    # que o timeout (S7) aparecem como latência; mais longas (S8) aparecem como falha.
+    coherent("S7: R5 = 0 (expectativa revisada após o Ciclo 2, D-022)", ["S7"],
+             lambda: all(v == 0 for v in vals("S7", "R5_pct")),
+             lambda: f"R5 (%) por execução: {lst(vals('S7', 'R5_pct'))}")
+    coherent("S8: R5 > 0 (expectativa revisada após o Ciclo 2, D-022)", ["S8"],
+             lambda: all(v > 0 for v in vals("S8", "R5_pct")),
+             lambda: f"R5 (%) por execução: {lst(vals('S8', 'R5_pct'))}")
 
     s9 = []
     for d, m in valid:

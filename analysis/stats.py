@@ -16,11 +16,18 @@ import numpy as np
 from scipy.stats import mannwhitneyu
 
 BASELINE = "S0"
-# Métricas testadas contra S0 (Mann–Whitney bilateral + Holm). D4 só existe em S6 e D3 não
-# existe em S0, então não entram em nenhuma comparação (são descritas, não testadas).
-TESTED = ["R4", "R5_pct", "D1_median_ms", "D1_p95_ms", "D1_max_ms", "D2_s", "D3_s", "D5", "D6"]
-DESCRIBED = TESTED + ["R1_pct", "R2", "D3_n", "D4_events_per_s", "C1", "C2", "C3", "C4",
-                      "n_requests", "wall_time_s"]
+# Métricas testadas contra S0 (Mann–Whitney bilateral), por família = dimensão da pergunta de
+# pesquisa (DECISIONS.md, D-017). Holm é aplicado dentro de cada família. Descritas, não testadas:
+# D1 máximo (depende de um único evento), D3 (não existe em S0), D4 (só S6), R3 (por cenário).
+FAMILIES = {
+    "confiabilidade": ["R4", "R5_pct"],
+    "desempenho": ["D1_median_ms", "D1_p95_ms", "D2_s", "D5", "D6"],
+    "consistencia": ["C2"],
+}
+TESTED = [m for metrics in FAMILIES.values() for m in metrics]
+FAMILY_OF = {m: f for f, metrics in FAMILIES.items() for m in metrics}
+DESCRIBED = TESTED + ["D1_max_ms", "D3_s", "R1_pct", "R2", "D3_n", "D4_events_per_s", "C1", "C3",
+                      "C4", "n_requests", "wall_time_s"]
 # Verificadas, não testadas: valor esperado fixo (plano, seção 7.2).
 EXPECTED = {"R1_pct": 100.0, "R2": 0, "C1": 0, "C3": 0, "C4": 0}
 # Verificações adicionais do protótipo (esperado zero em todas as execuções).
@@ -76,7 +83,7 @@ def summarize(rows):
     return out
 
 
-def compare(rows):
+def compare(rows, scope="family"):
     comparisons = []
     for sc in scenario_order(rows):
         if sc == BASELINE:
@@ -86,22 +93,34 @@ def compare(rows):
             if not a or not b:
                 continue
             if len(set(a) | set(b)) == 1:
-                # Todos os valores iguais nos dois grupos: sem diferença; o teste é indefinido.
+                # Empate total (ex.: R5 = 0 nos dois grupos): teste indefinido. Registra p = 1 e a
+                # comparação continua na contagem do Holm (regra fixada antes da coleta, D-017).
                 stat, p, note = math.nan, 1.0, "valores idênticos nos dois grupos; p = 1"
             else:
                 res = mannwhitneyu(a, b, alternative="two-sided")
                 stat, p, note = float(res.statistic), float(res.pvalue), ""
             comparisons.append({
-                "scenario": sc, "metric": metric, "n_scenario": len(a), "n_baseline": len(b),
+                "family": FAMILY_OF[metric], "scenario": sc, "metric": metric,
+                "n_scenario": len(a), "n_baseline": len(b),
                 "median_scenario": float(np.median(a)), "median_baseline": float(np.median(b)),
                 "median_diff": float(np.median(a) - np.median(b)),
                 "U": stat, "p": p, "note": note,
             })
-    adjusted = holm([c["p"] for c in comparisons])
-    for c, p_adj in zip(comparisons, adjusted):
-        c["p_holm"] = p_adj
-        c["significant_0_05"] = p_adj < 0.05
+    apply_holm(comparisons, scope)
     return comparisons
+
+
+def apply_holm(comparisons, scope="family"):
+    """Holm dentro de cada família (padrão, D-017) ou sobre todas as comparações (scope="all")."""
+    groups = defaultdict(list)
+    for c in comparisons:
+        groups[c["family"] if scope == "family" else "todas"].append(c)
+    for group in groups.values():
+        for c, p_adj in zip(group, holm([c["p"] for c in group])):
+            c["holm_group"] = c["family"] if scope == "family" else "todas"
+            c["holm_m"] = len(group)
+            c["p_holm"] = p_adj
+            c["significant_0_05"] = p_adj < 0.05
 
 
 def alerts(rows):
@@ -133,13 +152,16 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--metrics", default="data/processed/metrics_per_run.csv")
     ap.add_argument("--out", default="data/processed")
+    ap.add_argument("--holm-scope", choices=["family", "all"], default="family",
+                    help="family (padrão, D-017): Holm dentro de cada dimensão; all: sobre todas")
     args = ap.parse_args(argv)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     rows = load_rows(args.metrics)
 
     write_csv(out / "summary_by_scenario.csv", summarize(rows))
-    comparisons = compare(rows) if any(r["scenario"] == BASELINE for r in rows) else []
+    comparisons = (compare(rows, args.holm_scope)
+                   if any(r["scenario"] == BASELINE for r in rows) else [])
     write_csv(out / "comparisons_vs_S0.csv", comparisons)
     alert_lines = alerts(rows)
     (out / "alerts.txt").write_text(
@@ -147,7 +169,13 @@ def main(argv=None):
     info = {
         "test": "scipy.stats.mannwhitneyu(alternative='two-sided')",
         "correction": "Holm (implementação própria, analysis/stats.py::holm)",
+        "holm_scope": args.holm_scope,
+        "hypotheses": "H0: a distribuição da métrica no cenário é igual à de S0; "
+                      "H1: é diferente (bilateral)",
+        "ties_rule": "empate total nos dois grupos: p = 1, mantido na contagem do Holm",
         "n_comparisons": len(comparisons),
+        "n_comparisons_by_family": {f: sum(1 for c in comparisons if c["family"] == f) for f in FAMILIES},
+        "families": FAMILIES,
         "tested_metrics": TESTED,
         "verified_metrics": EXPECTED,
         "baseline": BASELINE,

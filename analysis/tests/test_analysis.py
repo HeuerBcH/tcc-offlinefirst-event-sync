@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from metrics import c3, c4, d3_values, queue_series, t_ref_ns  # noqa: E402
-from stats import holm  # noqa: E402
+from stats import FAMILIES, apply_holm, holm  # noqa: E402
 
 
 class HolmTest(unittest.TestCase):
@@ -22,6 +22,22 @@ class HolmTest(unittest.TestCase):
     def test_caps_at_one_and_keeps_ties(self):
         self.assertEqual(holm([0.5, 0.5, 0.9]), [1.0, 1.0, 1.0])
         self.assertEqual(holm([]), [])
+
+
+class HolmFamilyTest(unittest.TestCase):
+    def test_families_match_d017(self):
+        self.assertEqual(FAMILIES, {"confiabilidade": ["R4", "R5_pct"],
+                                    "desempenho": ["D1_median_ms", "D1_p95_ms", "D2_s", "D5", "D6"],
+                                    "consistencia": ["C2"]})
+
+    def test_holm_within_family_vs_all(self):
+        comps = [{"family": "a", "p": 0.01}, {"family": "a", "p": 0.04},
+                 {"family": "b", "p": 0.03}, {"family": "b", "p": 0.005}]
+        apply_holm(comps, "family")
+        self.assertEqual([round(c["p_holm"], 6) for c in comps], [0.02, 0.04, 0.03, 0.01])
+        self.assertEqual({c["holm_m"] for c in comps}, {2})
+        apply_holm(comps, "all")  # mesmo exemplo do teste à mão acima
+        self.assertEqual([round(c["p_holm"], 6) for c in comps], [0.03, 0.06, 0.06, 0.02])
 
 
 # Eventos no formato da consulta de metrics.load_run: (event_id, seq, created, acked, attempts, bytes)
